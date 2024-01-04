@@ -1,2 +1,2 @@
 # Sift
-SIFT - Scripted Interactive Function Test
+SIFT - Scripted Interactive Functional Test
