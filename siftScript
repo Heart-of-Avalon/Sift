@@ -1,0 +1,25 @@
+# Wouldn't it be...
+echo Lovely
+
+# just tea for two and two for tea
+layer echo cake
+
+# Can we do this...?  Yes, we can
+echo Trying cmd==echo To cmd==echo Be cmd==echo Loud
+
+var naplen=4
+echo Sleeping for $naplen seconds...
+
+# LABEL startNap
+sleep $naplen
+
+eval($naplen - 1)
+var naplen=$result
+
+echo Zzzz...
+if($naplen > 0) jump startNap
+
+echo YAWN Shhhhhhh
+
+# Enough for now!
+quit
