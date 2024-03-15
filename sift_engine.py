@@ -120,6 +120,8 @@ def sift_csub(cmd_list, vdc, substi_str):
 module_list = {}
 
 module_list["bash"] = "bash"
+module_list["py"]   = "python3"
+module_list["hunt"] = "hunt"
 # ================================================================================
 def sift_engine(layer, cmd_line):
     global var_dict
@@ -210,11 +212,19 @@ def sift_engine(layer, cmd_line):
             if module in module_list.keys():
                 pred = grab_predic8(cmd, module)
                 cwords = pred.split()
-                #print("\tCMD:\t" + cwords[0])
-                #print("\tARG:\t" + " ".join(cwords[1:]))
-                result = subprocess.run(cwords, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                var_dict["subproc"] = result.stdout.decode('utf-8')
-                print(var_dict["subproc"], end='')
+                if module != "bash":
+                    cwords = [module_list[module]] + cwords
+                # print("\tCMD:\t" + cwords[0])
+                # print("\tARG:\t" + " ".join(cwords[1:]))
+                try:
+                    result = subprocess.run(cwords, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    var_dict["ret"] = str(result)
+                    var_dict["subproc"] = result.stdout.decode('utf-8')
+                    print(var_dict["subproc"], end='')
+                except IOError: 
+                    print("Error: Failed to Run Sub-Process \"" + cwords[0] + "\" -- command not found")
+                    var_dict["ret"] = "CmdNotFound"
+                    var_dict["subproc"] = ""
                 continue
 
             pred = grab_predic8(cmd, "sleep")
@@ -278,6 +288,17 @@ def sift_engine(layer, cmd_line):
                     var_dict[varr] = vall
                 continue
 
+            pred = grab_predic8(cmd, "module")
+            if pred != "":
+                modd = pred.split("=")[0]
+                nomm = grab_predic8(pred, modd, "=")
+                if nomm == "XXX":
+                    if module_list.get(modd, None) != None:
+                        del module_list[modd]
+                else:
+                    module_list[modd] = nomm
+                continue
+
             if match_cmd(cmd, "push"):
                 pred = grab_predic8(cmd, "push")
                 var_stack.append(pred)
@@ -297,6 +318,7 @@ def sift_engine(layer, cmd_line):
             if pred != "":
                 jpoint = pred.split()[0]
                 jhunt = "LABEL " + jpoint
+                found = False
                 # print("Hunting for " + jhunt)
                 if jpoint != "":
                     totallen = len(cmd_list)
@@ -306,13 +328,17 @@ def sift_engine(layer, cmd_line):
                         if jhunt in cmd_list[idx]:
                             print("Jumping to Label: " + jpoint)
                             cmd_num = idx
+                            found = True
                             break
+                if not found:
+                    print("FAILED to Find Label: \"" + jpoint + "\"")
                 continue
 
             pred = grab_predic8(cmd, "call")
             if pred != "":
                 jpoint = pred.split()[0]
                 jhunt = "LABEL " + jpoint
+                found = False
                 var_dict["ret"] = ""
                 # print("Hunting for " + jhunt)
                 if jpoint != "":
@@ -335,7 +361,10 @@ def sift_engine(layer, cmd_line):
 
                             print("Calling Sub at Label: " + jpoint)
                             cmd_num = idx
+                            found = True
                             break
+                if not found:
+                    print("FAILED to Find Label: \"" + jpoint + "\"")
                 continue
 
             if match_cmd(cmd, "return"):

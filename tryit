@@ -1,0 +1,39 @@
+#
+#
+#
+var count=1
+# LABEL top
+echo Lalala $count
+sleep 1
+#
+#
+#
+eval($count + 1)
+var count=$result
+if($count < 5) jump top
+echo All Done
+#
+#
+echo " These ; Are ; The ; Voyages ; 0 ; 0.0 ; False "
+echo Of cmd==echo The cmd==echo Starship cmd==echo Potemkin
+
+bash hwc "I Love You"
+bash hwc We have not the str
+
+sleep 1
+bash sendhwc SetLED;0;0;1;1000;100
+echo BLUE Blinker
+sleep 3
+bash sendhwc SetLED;0;1;0;300;700
+echo GREEN Blip
+sleep 3
+bash sendhwc SetLED;1;0;0;200;100
+echo RED Warning
+sleep 2
+bash sendhwc Beep
+bash sendhwc SetLED;0;1;1;1000;700
+echo TEAL Purr
+
+
+#
+#

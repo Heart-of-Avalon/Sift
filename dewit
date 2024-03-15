@@ -1,0 +1,16 @@
+############################################################
+bash sendhwc "I Love You"
+bash sendhwc We have not the str
+sleep 2
+
+bash sendhwc SetLED;0;0;1;1000;100
+sleep 1
+echo $subproc
+sleep 4
+
+hwc SetLED;0;0;1;1000;100
+sleep 2
+
+bash snedhwc SetLED;0;0;1;1000;100
+
+############################################################

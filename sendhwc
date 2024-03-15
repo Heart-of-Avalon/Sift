@@ -1,0 +1,2 @@
+#!/usr/bin/bash
+echo "$@" | tee | nc 127.0.0.1 13000 >& 1
