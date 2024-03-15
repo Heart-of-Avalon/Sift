@@ -491,7 +491,7 @@ def sift_engine(layer, cmd_line):
         return
     else:
         print("========================================")
-        print("Exiting Sifteyond Engine")
+        print("Exiting SIFT Engine")
         print("========================================")
 
 
