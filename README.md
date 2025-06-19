@@ -46,17 +46,20 @@ SIFT:
 # ANY-TEXT
 	ANY-TEXT is a Comment (Do Nothing)
 
-quit  OR   exit
-	Terminate the current layer of interaction
-
 nop
 	Do Nothing
+
+quit  OR  exit
+	Terminate the current layer of interaction
 
 bash <command> <parameters>
 	Execute "<command> <parameters>" as a sub-process in a bash shell
 
+dos <command> <parameters>
+	Execute "<command> <parameters>" as a sub-process in a DOS shell
+
 py <parameters>
-	Execute "python3 <parameters>" as a sub-process in a bash shell
+	Execute "python3 <parameters>" as a sub-process in a bash/DOS shell
 	Example:
 		py fun.py
 		Execute "python3 fun.py" as a sub-process in a bash shell
@@ -65,7 +68,7 @@ hunt <search-string> <filename>
 	Use a bash sub-process to search (grep) for <search-string> in <filename>
 
 sleep <N>
-	Pause, Idle for <N> seconds
+	Pause, Idle for <N> miliseconds
 
 echo ANY-TEXT
 	Write ANY-TEXT to console output
@@ -80,6 +83,9 @@ prompt <prompt-text>
 var <varname>=<value>
 	Set global symbol <varname> to map to <value>
 	NOTE: if <value> == "XXX", then remove global symbol <varname> from the list
+var <varname>=eval( expr )
+	ALTERNATE: as a special case, Evaluate expr as a python expression, then do:
+		var <varname>=<expr-value>
 	NOTE: Can use Variable Substitution in any command, comment, etc:
 	  Replace $varname , ${varname} ,  or $(varname) with <value>
 
@@ -88,11 +94,11 @@ module <module-name>=<module-cmd>
 	NOTE: if <module-cmd> == "XXX", then remove global module <module-name> from the list
 	NOTE: Can use <module-name> as a command, like this
 	      <module-name> <parameters>
-		Execute "<module-cmd> <parameters>" as a sub-process in a bash shell
+		Execute "<module-cmd> <parameters>" as a sub-process in a bash/DOS shell
 	Example:
 		module hwc sendhwc
 		hwc Beep
-		--> runs bash sub-process: "sendhwc Beep"
+		--> runs shell sub-process: "sendhwc Beep"
 
 push <value>
 	Push <value> onto the Variable Stack

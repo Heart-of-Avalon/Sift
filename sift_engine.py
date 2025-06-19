@@ -1,18 +1,118 @@
 # ================================================================================
 # sift_engine.py
-# The Entry point for the Test machine for
-# the Rules Engine for the Game of Sifteyond
+# The Entry point for the SIFT Test Machine
 #
 # Author:  Paul Melville
 # Created: 25 APR 2023
 # ================================================================================
 import sys
 import time
-import readline
-import subprocess
+import subprocess, os
 from ast import literal_eval
 from collections import deque
 from sift_util import *
+try:
+    import readline
+except ImportError:
+    import pyreadline as readline
+
+# ================================================================================
+# Dictionary of Delimiter Pairs
+# ================================================================================
+delim_dict = {
+    '(': ')',
+    '{': '}',
+    '[': ']',
+    '"': '"',
+    "'": "'"
+}
+
+# ================================================================================
+# Search a string to find the specified begin-delimiter
+# ================================================================================
+def find_delim(s, delim, start=0):
+    # Over before it's begun
+    if start < 0:
+        return start
+    """
+    Finds the specified opening delimiter
+    skipping over escaped characters and in-quote character
+
+    Parameters:
+        s (str): The input string.
+        delim (str): The opening delimiter
+        start (int): The index of the start of the search
+
+    Returns:
+        int: Index of the opening delimiter, or -1 if not found.
+    """
+    if delim not in delim_dict:
+        return -1
+
+    i = start
+    while i < len(s):
+        c = s[i]
+        # Skip escaped characters
+        if c == '\\':
+            i += 2
+            continue
+        # Found the opening delimiter!
+        if c == delim:
+            return i
+        if c == "'" or c == '"':
+            # Skip over the quoted part
+            inner_end = find_delim_match(s, c, i)
+            if inner_end == -1:
+                return -1
+            i = inner_end  # resume scanning after inner match
+        i += 1
+    return -1  # No match found
+
+# ================================================================================
+# Search a string to find the end-delimiter that matches the provided beginning delimiter
+# ================================================================================
+def find_delim_match(s, delim, start=0):
+    # Over before it's begun
+    if start < 0:
+        return start
+    """
+    Finds the matching closing delimiter for the given opening delimiter,
+    skipping over escaped characters, in-quote character, and respecting nested delimiters.
+
+    Parameters:
+        s (str): The input string.
+        delim (str): The opening delimiter to match.
+        start (int): The index of the opening delimiter in s.
+
+    Returns:
+        int: Index of the matching closing delimiter, or -1 if unmatched.
+    """
+    if delim not in delim_dict:
+        return start + 1  # Not a delimiter — signal to skip it
+
+    closing = delim_dict[delim]
+    i = start + 1
+
+    inquote = True if delim == '"' or delim == "'" else False
+
+    while i < len(s):
+        c = s[i]
+        # Skip escaped characters
+        if c == '\\':
+            i += 2
+            continue
+        # Found the ending delimiter!
+        if c == closing:
+            return i
+
+        newquote = True if (delim == '"' and c == "'") or (delim == "'" and c== '"') else False
+        if c in delim_dict and (not inquote or newquote):
+            inner_end = find_delim_match(s, c, i)
+            if inner_end == -1:
+                return -1
+            i = inner_end  # resume scanning after inner match
+        i += 1
+    return -1  # No match found
 
 # ================================================================================
 var_dict = {}
@@ -76,6 +176,48 @@ def sift_sub(cmdsub):
     return cmdsub
 
 # ================================================================================
+def replace_delim(cmd_line, delim, vdc):
+    """
+    Replaces unquoted and unescaped occurrences of `delim` with `vdc` in the input string.
+    Quoted regions (single or double) are skipped entirely.
+    Escaped delimiters are ignored.
+    """
+    result = []
+    i = 0
+    in_quote = None  # None or one of: "'", '"'
+
+    while i < len(cmd_line):
+        c = cmd_line[i]
+
+        if c == '\\':
+            # Escape sequence: copy next char literally
+            result.append(cmd_line[i:i+2])
+            i += 2
+            continue
+
+        if in_quote:
+            result.append(c)
+            if c == in_quote:
+                in_quote = None  # End of quote
+            i += 1
+            continue
+
+        if c in ('"', "'"):
+            in_quote = c
+            result.append(c)
+            i += 1
+            continue
+
+        if c == delim:
+            result.append(vdc)
+        else:
+            result.append(c)
+
+        i += 1
+
+    return ''.join(result)
+
+# ================================================================================
 def sift_repl(cmd_line, vdc, substi_str):
     # Replace all ESC-vdc and also (in-quote vdc) with (substi_str)
     new_cmd_line = ""
@@ -119,14 +261,16 @@ def sift_csub(cmd_list, vdc, substi_str):
 # ================================================================================
 module_list = {}
 
-module_list["bash"] = "bash"
-module_list["py"]   = "python3"
-module_list["hunt"] = "hunt"
+module_list["bash"]    = " "
+module_list["dos"]     = " "
+module_list["py"]      = "python3"
+module_list["harvest"] = "harvest"
+module_list["hunt"]    = "hunt"
 # ================================================================================
 def sift_engine(layer, cmd_line):
     global var_dict
 
-    # print("SIFT Start Layer " + str(layer) + ": " + cmd_line)
+    # print(f"SIFT Start Layer {layer}: {cmd_line}")
     # Prep the Engine
     if layer == 0:
         # Init the SIFT Data Structures
@@ -141,13 +285,17 @@ def sift_engine(layer, cmd_line):
         prompt += ":"
     prompt += "SIFT" + str(layer) + "> "
 
-    # Replace all ("\;") and also (in-quote ";") with (".SEMI.")
-    vdc = "cmd=="
-    repl_str = "CMD_EQ"
-    cmd_line = sift_repl(cmd_line, vdc, repl_str)
+    # Fixup the CmdLine
+    vdc   = "=NEW_CMD="
+    # Step 1: Replace instances of <newline> with our VDC (Virtual Delimiter of Commands)
+    cmd_line = cmd_line.replace('\n', f" {vdc} ")
+    # print(f"CMD_LINE:\n{cmd_line}\n------------->EOC")
+
+    # Step 2: Replace un-quoted and un-escaped ";" with our VDC
+    cmd_line = replace_delim(cmd_line, ';', vdc)
+
+    # Step 3: Split (per VDC) into individual single-line commands
     cmd_list = cmd_line.split(vdc)
-    # For each command in the list, replace (repl_str) with (vdc)
-    cmd_list = sift_csub(cmd_list, vdc, repl_str)
 
     # Loop thru the commands, then interactively
     cmd_num = 0
@@ -162,9 +310,9 @@ def sift_engine(layer, cmd_line):
             # Take Input interactively from the user
             cmd = input(prompt)
 
-        # print("SplitCmd: \"" + cmd + "\"")
+        # print("Spl1tCmd: \"" + cmd + "\"")
         cmd = cmd.lstrip().strip()
-        # print("StripCmd: \"" + cmd + "\"")
+        # print("Str1pCmd: \"" + cmd + "\"")
         if len(cmd) == 0:
             # 'tis an Empty Command
             # print("\t\tEmpty Cmd")
@@ -173,23 +321,23 @@ def sift_engine(layer, cmd_line):
         # Variable Substitution
         cmd = sift_sub(cmd)
 
-        # print("SplitCmd: \"" + cmd + "\"")
+        # print("Spl2tCmd: \"" + cmd + "\"")
         cmd = cmd.lstrip().strip()
-        # print("StripCmd: \"" + cmd + "\"")
+        # print("Str2pCmd: \"" + cmd + "\"")
         if len(cmd) == 0:
             # 'tis an Empty Command
             # print("\t\tEmpty Cmd")
             continue
 
         procCmd = True
+        # print("Here we go!")
         while procCmd:
             procCmd = False
             # TBD: Log the Command in the CommandLog
+            # print("...again...!")
 
             if cmd[0] == '#':
                 # 'tis a Comment!
-                if layer > 0:
-                    print(cmd)
                 continue
 
             if match_cmd(cmd, "quit"):
@@ -212,12 +360,19 @@ def sift_engine(layer, cmd_line):
             if module in module_list.keys():
                 pred = grab_predic8(cmd, module)
                 cwords = pred.split()
-                if module != "bash":
+                default_shell = "dos" if os.name == 'nt' else "bash"
+                if module != default_shell:
                     cwords = [module_list[module]] + cwords
                 # print("\tCMD:\t" + cwords[0])
                 # print("\tARG:\t" + " ".join(cwords[1:]))
                 try:
-                    result = subprocess.run(cwords, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    if default_shell == "dos":
+                        cmd = " ".join(cwords)  # Windows CMD wants a string
+                        # print(f"DOSCMD: \"{cmd}\"")
+                        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+                    else:
+                        result = subprocess.run(cwords, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
                     var_dict["ret"] = str(result)
                     var_dict["subproc"] = result.stdout.decode('utf-8')
                     print(var_dict["subproc"], end='')
@@ -230,7 +385,8 @@ def sift_engine(layer, cmd_line):
             pred = grab_predic8(cmd, "sleep")
             if pred != "":
                 dura = int(pred)
-                print("Sleeping for " + str(dura) + "s")
+                dura = dura / 1000.0
+                # print("Sleeping for " + str(dura) + "s")
                 time.sleep(dura)
                 continue
 
@@ -284,8 +440,26 @@ def sift_engine(layer, cmd_line):
                 if vall == "XXX":
                     if var_dict.get(varr, None) != None:
                         del var_dict[varr]
+                # Assign varr from an eval sub-expression
+                elif grab_predic8(vall, "eval", "("):
+                    subcmd = f"{vall} {vdc} quit"
+                    sift_engine(layer+1, subcmd)
+                    var_dict[varr] = var_dict.get("result", "0")
                 else:
                     var_dict[varr] = vall
+                continue
+
+            # This is mainly for debug purposes
+            pred = grab_predic8(cmd, "delim")
+            if pred != "":
+                delim = pred.split("=")[0]
+                linea = grab_predic8(pred, delim, "=")
+                begin = find_delim(linea, delim)
+                enddd = find_delim_match(linea, delim, begin)
+                print(f"Begin @{begin:3}  End @{enddd:3}")
+                print(f"{linea}")
+                if begin >= 0 and enddd >= 0:
+                    print(''.join('^' if i in (begin, enddd) else ' ' for i in range(max(begin, enddd) + 1)))
                 continue
 
             pred = grab_predic8(cmd, "module")
@@ -326,7 +500,7 @@ def sift_engine(layer, cmd_line):
                     for idx in range(0,totallen):
                         # print("Looking for \"{}\" in \"{}\"".format(jhunt, cmd_list[idx]))
                         if jhunt in cmd_list[idx]:
-                            print("Jumping to Label: " + jpoint)
+                            # print("Jumping to Label: " + jpoint)
                             cmd_num = idx
                             found = True
                             break
@@ -359,7 +533,7 @@ def sift_engine(layer, cmd_line):
                             var_stack.append(var_dict["R6"])
                             var_stack.append(var_dict["R7"])
 
-                            print("Calling Sub at Label: " + jpoint)
+                            # print("Calling Sub at Label: " + jpoint)
                             cmd_num = idx
                             found = True
                             break
@@ -389,22 +563,27 @@ def sift_engine(layer, cmd_line):
             pred = grab_predic8(cmd, "eval", "(")
             if pred != "":
                 try:
-                    endo = pred.rindex(")")
+                    endo = find_delim_match(pred, "(")
                 except ValueError:
-                    print("Malformed Expression: {}".format(pred))
+                    print(f"Malformed Expression: {pred}")
                     continue
                 pred = pred[:endo]
                 pred = pred.lstrip().rstrip()
-                # print("Requested Evaluation: ({})".format(pred))
+                # print(f"Requested Evaluation: ({pred})")
                 clean_str = True
                 skipstr = pred
-                inquote = False
+                inquote_single = False
+                inquote_double = False
                 for idx in range(0,len(skipstr)):
                     if pred[idx] == '"':
-                        inquote = True if inquote == False else False
-                    if inquote:
+                        inquote_double = False if inquote_double else True
+                    if inquote_double:
                         continue
-                    if pred[idx] in "_ghjklmpqsuvwyzGHIJKLMNOPQRSTUVWYZ":
+                    if pred[idx] == "'":
+                        inquote_single = False if inquote_single else True
+                    if inquote_single:
+                        continue
+                    if pred[idx] in "_ghjkmpqsuvwyzGHIJKLMNOPQRSTUVWYZ":
                         print("Expression Contains \"{}\": {}".format(pred[idx],pred))
                         print("Will not Evaluate")
                         clean_str = False
@@ -415,6 +594,7 @@ def sift_engine(layer, cmd_line):
                 # print("Evaluating ({})".format(pred))
                 try:
                     rez = eval(pred)
+                    # print(f"EVAL({pred}) --> \"{rez}\"")
                 except SyntaxError:
                     print("Bad Syntax!")
                     rez = "NULL"
@@ -432,15 +612,15 @@ def sift_engine(layer, cmd_line):
             pred = grab_predic8(cmd, "if", "(")
             if pred != "":
                 try:
-                    endo = pred.rindex(")")
+                    endo = find_delim_match(pred, "(")
                 except ValueError:
-                    print("Malformed Expression: {}".format(pred))
+                    print(f"Malformed Expression: {pred}")
                     continue
                 nokori = pred[endo+1:]
                 pred = pred[:endo]
                 pred = pred.lstrip().rstrip()
                 #print("\t\tEVALUATING: " + pred)
-                subcmd = "eval( " + pred + " ) cmd== quit"
+                subcmd = f"eval( {pred} ) {vdc} quit"
                 sift_engine(layer+1, subcmd)
                 if var_dict.get("result", "False") == "False":
                     continue
@@ -456,7 +636,7 @@ def sift_engine(layer, cmd_line):
 
             if match_cmd(cmd, "layer"):
                 pred = grab_predic8(cmd, "layer")
-                sift_engine(layer+1, pred + "cmd== quit")
+                sift_engine(layer+1, pred)
                 continue
 
             fyle = ""
@@ -472,9 +652,10 @@ def sift_engine(layer, cmd_line):
                 try:
                     # print("Opening Script File \"" + fyle + "\"")
                     with open(fyle, 'r') as file:
-                        pred = file.read().replace('\n', " cmd== ")
-                        pred += "cmd== quit"
-                except IOError: 
+                        pred = file.read()
+                        # print(f"FILE READ:\n{pred}\n------------->EOF")
+                        pred += f"\nquit"
+                except IOError:
                     print("Error: Script File \"" + fyle + "\" not found")
                     continue
 
@@ -500,6 +681,7 @@ if __name__ == '__main__':
     # print(sys.argv)
     cmd_line = ""
     if len(sys.argv) > 1:
+        # print(sys.argv[1:])
         # Get the list of commands
         cmd_line=' '.join(sys.argv[1:])
         # print("CmdLine: \"" + cmd_line + "\"")
