@@ -8,15 +8,16 @@ layer echo cake
 echo Trying cmd==echo To cmd==echo Be cmd==echo Loud
 
 var naplen=4
-echo Sleeping for $naplen seconds...
 
 # LABEL startNap
-sleep $naplen
+echo Sleeping for $naplen seconds... Zzzz...
+eval( $naplen * 1000 )
+var naplenms=$result
+sleep $naplenms
 
 eval($naplen - 1)
 var naplen=$result
 
-echo Zzzz...
 if($naplen > 0) jump startNap
 
 echo YAWN Shhhhhhh
