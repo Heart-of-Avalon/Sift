@@ -373,8 +373,9 @@ def sift_engine(layer, cmd_line):
                     else:
                         result = subprocess.run(cwords, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-                    var_dict["ret"] = str(result)
+                    var_dict["ret"]     = str(result)
                     var_dict["subproc"] = result.stdout.decode('utf-8')
+                    var_dict["subout"]  = "".join((" RET ".join(var_dict["subproc"].split('\n')).split('\r')))
                     print(var_dict["subproc"], end='')
                 except IOError: 
                     print("Error: Failed to Run Sub-Process \"" + cwords[0] + "\" -- command not found")
@@ -522,6 +523,7 @@ def sift_engine(layer, cmd_line):
                         # print("Looking for \"{}\" in \"{}\"".format(jhunt, cmd_list[idx]))
                         if jhunt in cmd_list[idx]:
                             # Push the Return-Address for Later
+                            # print(f"                     Call   from {cmd_num}")
                             var_stack.append(cmd_num)
                             # Push the Temp Regs
                             var_stack.append(var_dict["R0"])
@@ -535,6 +537,7 @@ def sift_engine(layer, cmd_line):
 
                             # print("Calling Sub at Label: " + jpoint)
                             cmd_num = idx
+                            # print(f"                     Call    to  {cmd_num}")
                             found = True
                             break
                 if not found:
@@ -557,7 +560,9 @@ def sift_engine(layer, cmd_line):
                 var_dict["R1"] = var_stack.pop()
                 var_dict["R0"] = var_stack.pop()
                 # Pop the Return-Address ... and Jump to that Command-Number
+                # print(f"                     Return from {cmd_num}")
                 cmd_num = var_stack.pop()
+                # print(f"                     Return  to  {cmd_num}")
                 continue
 
             pred = grab_predic8(cmd, "eval", "(")
@@ -583,7 +588,7 @@ def sift_engine(layer, cmd_line):
                         inquote_single = False if inquote_single else True
                     if inquote_single:
                         continue
-                    if pred[idx] in "_ghjkmpqsuvwyzGHIJKLMNOPQRSTUVWYZ":
+                    if pred[idx] in "_gjkqsvyzGHIJKLMNOPQRSTUVWYZ":
                         print("Expression Contains \"{}\": {}".format(pred[idx],pred))
                         print("Will not Evaluate")
                         clean_str = False
@@ -619,7 +624,7 @@ def sift_engine(layer, cmd_line):
                 nokori = pred[endo+1:]
                 pred = pred[:endo]
                 pred = pred.lstrip().rstrip()
-                #print("\t\tEVALUATING: " + pred)
+                # print("\t\tEVALUATING: " + pred)
                 subcmd = f"eval( {pred} ) {vdc} quit"
                 sift_engine(layer+1, subcmd)
                 if var_dict.get("result", "False") == "False":
@@ -629,7 +634,7 @@ def sift_engine(layer, cmd_line):
                 elif var_dict.get("result", "0.0") == "0.0":
                     continue
                 cmd = nokori.lstrip()
-                #print("\t\tNEW-CMD: " + cmd)
+                # print("\t\tNEW-CMD: " + cmd)
                 procCmd = True
                 # print("CONDITIONAL Cmd: \"{}\"".format(cmd))
                 continue
