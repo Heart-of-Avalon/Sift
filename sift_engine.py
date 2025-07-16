@@ -376,7 +376,8 @@ def sift_engine(layer, cmd_line):
                     var_dict["ret"]     = str(result)
                     var_dict["subproc"] = result.stdout.decode('utf-8')
                     var_dict["subout"]  = "".join((" RET ".join(var_dict["subproc"].split('\n')).split('\r')))
-                    print(var_dict["subproc"], end='')
+                    if layer == 0:
+                        print(var_dict["subproc"], end='')
                 except IOError: 
                     print("Error: Failed to Run Sub-Process \"" + cwords[0] + "\" -- command not found")
                     var_dict["ret"] = "CmdNotFound"
@@ -393,8 +394,7 @@ def sift_engine(layer, cmd_line):
 
             if match_cmd(cmd, "echo"):
                 pred = grab_predic8(cmd, "echo")
-                if pred != "":
-                    print(pred)
+                print(pred)
                 continue
 
             pred = grab_predic8(cmd, "file")
@@ -427,7 +427,7 @@ def sift_engine(layer, cmd_line):
             pred = grab_predic8(cmd, "prompt")
             if pred != "":
                 try:
-                    resp = input(pred + ": ")
+                    resp = input(pred + " ")
                     var_dict["response"] = resp
                 except KeyboardInterrupt:
                     print("\nIgnoring Non-Response")
@@ -588,7 +588,7 @@ def sift_engine(layer, cmd_line):
                         inquote_single = False if inquote_single else True
                     if inquote_single:
                         continue
-                    if pred[idx] in "_gjkqsvyzGHIJKLMNOPQRSTUVWYZ":
+                    if pred[idx] in "_gjkqvyzGHIJKLMNOPQRSTUVWYZ":
                         print("Expression Contains \"{}\": {}".format(pred[idx],pred))
                         print("Will not Evaluate")
                         clean_str = False
